@@ -415,3 +415,235 @@ Virtual DOM 就是用一个原生的 JS 对象去描述一个 DOM 实例，所�
 
 可以把执行栈认为是一个存储函数调用的栈结构，它遵从先进后出的原则。
 当开始执行 JS 代码时，首先会执行一个 main 函数，然后执行我们的代码。根据先进后出的原则，后执行的函数会先弹出栈。
+
+## 重绘和回流
+
+1. 浏览器使用流式布局模型 (Flow Based Layout)。
+2. 浏览器会把 HTML 解析成 DOM，把 CSS 解析成 CSSOM，DOM 和 CSSOM 合并就产生了 Render Tree。
+3. 有了 RenderTree，我们就知道了所有节点的样式，然后计算他们在页面上的大小和位置，最后把节点绘制到页面上。
+4. 由于浏览器使用流式布局，对 Render Tree 的计算通常只需要遍历一次就可以完成，但 table 及其内部元素除外，他们可能需要多次计算，通常要花 3 倍于同等元素的时间，这也是为什么要避免使用 table 布局的原因之一。
+
+**一句话：回流必将引起重绘，重绘不一定会引起回流。**
+
+- 回流
+
+当 Render Tree 中部分或全部元素的尺寸、结构、或某些属性发生改变时，浏览器重新渲染部分或全部文档的过程称为回流。
+
+会导致回流的操作：
+
+页面首次渲染
+浏览器窗口大小发生改变
+元素尺寸或位置发生改变
+元素内容变化（文字数量或图片大小等等）
+元素字体大小变化
+添加或者删除可见的 DOM 元素
+激活 CSS 伪类（例如：:hover）
+查询某些属性或调用某些方法
+
+一些常用且会导致回流的属性和方法：
+
+clientWidth、clientHeight、clientTop、clientLeft
+offsetWidth、offsetHeight、offsetTop、offsetLeft
+scrollWidth、scrollHeight、scrollTop、scrollLeft
+scrollIntoView()、scrollIntoViewIfNeeded()
+getComputedStyle()
+getBoundingClientRect()
+scrollTo()
+
+- 重绘
+
+当页面中元素样式的改变并不影响它在文档流中的位置时（例如：color、background-color、visibility 等），浏览器会将新样式赋予给元素并重新绘制它，这个过程称为重绘。
+
+- 性能影响
+  回流比重绘的代价要更高。
+  有时即使仅仅回流一个单一的元素，它的父元素以及任何跟随它的元素也会产生回流。
+  现代浏览器会对频繁的回流或重绘操作进行优化：
+  浏览器会维护一个队列，把所有引起回流和重绘的操作放入队列中，如果队列中的任务数量或者时间间隔达到一个阈值的，浏览器就会将队列清空，进行一次批处理，这样可以把多次回流和重绘变成一次。
+
+- CSS
+  避免使用 table 布局。
+  尽可能在 DOM 树的最末端改变 class。
+  避免设置多层内联样式。
+  将动画效果应用到 position 属性为 absolute 或 fixed 的元素上。
+  避免使用 CSS 表达式（例如：calc()）。
+
+- JavaScript
+  避免频繁操作样式，最好一次性重写 style 属性，或者将样式列表定义为 class 并一次性更改 class 属性。
+  避免频繁操作 DOM，创建一个 documentFragment，在它上面应用所有 DOM 操作，最后再把它添加到文档中。
+  也可以先为元素设置 display: none，操作结束后再把它显示出来。因为在 display 属性为 none 的元素上进行的 DOM 操作不会引发回流和重绘。
+  避免频繁读取会引发回流/重绘的属性，如果确实需要多次使用，就用一个变量缓存起来。
+  对具有复杂动画的元素使用绝对定位，使它脱离文档流，否则会引起父元素及后续元素频繁回流。
+
+# Vue
+
+## Vue 的优点
+
+- 低耦合。视图（View）可以独立于 Model 变化和修改，一个 ViewModel 可以绑定到不同的"View"上，当 View 变化的时候 Model 可以不变，当 Model 变化的时候 View 也可以不变。
+
+- 可重用性。你可以把一些视图逻辑放在一个 ViewModel 里面，让很多 view 重用这段视图逻辑。
+
+- 独立开发。开发人员可以专注于业务逻辑和数据的开发（ViewModel），设计人员可以专注于页面设计
+
+## Vue 生命周期作用是什么
+
+它的生命周期中有多个事件钩子，让我们在控制整个 Vue 实例的过程时更容易形成好的逻辑
+
+## vue-loader 是什么？使用它的用途有哪些？
+
+解析.vue 文件的一个加载器，跟 template/js/style 转换成 js 模块。 用途：js 可以写 es6、style 样式可以 scss 或 less、template 可以加 jade 等
+
+## vuex 是什么
+
+vue 框架中状态管理
+
+## 哪种功能场景使用它（指 Vuex
+
+场景有：单页应用中，组件之间的状态。音乐播放、登录状态、加入购物车
+
+## vue 的双向绑定的原理是什么
+
+vue.js 是采用数据劫持结合发布者-订阅者模式的方式，通过 Object.defineProperty()来劫持各个属性的 setter，getter，在数据变动时发布消息给订阅者，触发相应的监听回调。
+
+## vuex 的 store 特性是什么
+
+- state 里面存放的数据是响应式的，vue 组件从 store 读取数据，若是 store 中的数据发生改变，依赖这相数据的组件也会发生更新
+- 它通过 mapState 把全局的 state 和 getters 映射到当前组件的 computed 计算属性
+
+## 不用 vuex 会带来什么问题
+
+- 可维护性会下降，你要修改数据，你得维护 3 个地方
+- 可读性下降，因为一个组件里的数据，你根本就看不出来是从哪里来的
+- 增加耦合，大量的上传派发，会让耦合性大大的增加，本来 Vue 用 Component 就是为了减少耦合，现在这么用，和组件化的初衷相背
+
+# React
+
+## React 性能优化
+
+- 在页面中使用了 setTimout()、addEventListener()等，要及时在 componentWillUnmount()中销毁在页面中使用了 setTimout()、addEventListener()等，要及时在 componentWillUnmount()中销毁
+- 使用异步组件
+- 使用 React-loadable 动态加载组件
+- shouldComponentUpdate(简称 SCU )、React.PureComponent、React.memo
+- 不可变值 ImmutableJS
+
+## PureComponent 和 memo
+
+- class 类组件中用 PureComponent，无状态组件(无状态)中用 memo
+- PureComponent, SCU 中实现了浅比较 s
+- 浅比较已使用大部分情况（尽量不要做深度比较）
+
+> PureComponent 与普通 Component 不同的地方在于，PureComponent 自带了一个 shouldComponentUpdate()，并且进行了浅比较
+
+## 组件生命周期
+
+### Initialization 初始化
+
+- constructor() : class 的构造函数，并非 React 独有
+
+### Mounting 挂载
+
+- componentWillMount() : 在组件即将被挂载到页面的时刻自动执行；
+- render() : 页面挂载；
+- componentDidMount() : 组件被挂载到页面之后自动执行；
+
+componentWillMount() 和 componentDidMount()，只会在页面第一次挂载的时候执行，state 变化时，不会重新执行
+
+### Updation 组件更新
+
+- shouldComponentUpdate() : 该生命周期要求返回一个 bool 类型的结果，如果返回 true 组件正常更新，如果返回 false 组件将不会更新；
+- componentWillUpdate() : 组件被更新之前执行，如果 shouldComponentUpdate()返回 false，将不会被被执行；
+- componentDidUpdate() : 组件更新完成之后执行；
+
+- componentWillReceiveProps() : props 独有的生命周期，执行条件如下：
+
+- 组件要从父组件接收参数；
+  只要父组件的 render()被执行了，子组件的该生命周期就会执行；
+  如果这个组件第一次存在于父组件中，不会执行；
+  如果这个组件之前已经存在于父组件中，才会执行；
+
+### Unmounting 组件卸载
+
+- componentWillUnmount() : 当组件即将被从页面中剔除的时候，会被执行
+
+### 重点 shouldComponentUpdate()
+
+`使用 shouldComponentUpdate()防止页面进行不必要的渲染`
+
+```
+# 用生命周期进行性能优化
+shouldComponentUpdate () {
+    if (nextProps.content !== this.props.content) {
+      return true;
+    }
+    return false;
+}
+```
+
+## 无状态组件(函数组件)
+
+当一个组件只有一个 render()函数时，我们就可将这个组件定义为无状态组件，无状态组件只有一个函数。
+无状态组件的性能比较高，因为它仅是一个函数，而普通组件是一个 class。
+
+## 异步组件
+
+```
+// 引入需要异步加载的组件
+const LazyComponent = React.lazy(() => import('./lazyDemo') )
+
+// 使用异步组件，异步组件加载中时，显示fallback中的内容
+<React.Suspense fallback={<div>异步组件加载中</div>}>
+    <LazyComponent />
+</React.Suspense>
+
+```
+
+## Render Props
+
+Render Props 核心思想：通过一个函数将 class 组件的 state 作为 props 传递给纯函数组件
+
+```
+class Factory extends React.Component {
+    constructor () {
+        this.state = {
+            /* 这里 state 即多个组件的公共逻辑的数据 */
+        }
+    }
+    /* 修改 state */
+    render () {
+        return <div>{this.props.render(this.state)}</div>
+    }
+}
+
+const App = () => {
+    /* render 是一个函数组件 */
+    <Factory render={
+        (props) => <p>{props.a} {props.b}...</p>
+    } />
+}
+
+```
+
+## JSX 本质
+
+- JSX 等同于 Vue 模板
+- Vue 模板不是 html
+- JSX 也不是 JS
+
+讲 JSX 语法，通过 React.createElement()编译成 Dom，BABEL 可以编译 JSX
+流程：JSX => React.createElement() => 虚拟 DOM (JS 对象) => 真实 DOM
+React 底层会通过 React.createElement() 这个方法，将 JSX 语法转成 JS 对象，React.createElement() 可以接收三个参数，第一个为标签名称，第二参数为属性，第三个参数为内容
+
+```
+createElement() 根据首字母大小写来区分是组件还是HTML标签，React规定组件首字母必须大写，HTML规定标签首字母必须小写
+
+// 第一个参数为 标签(tag) 可为 'div'标签名 或 List组件
+// 第二个参数为：属性(props)
+// 第三个参数之后都为子节点(child)，可以在第三个参数传一个数组，也可以在第三、四、五....参数中传入
+React.createElement('tag', null, [child1, chlild2, child3])
+或者
+React.createElement('tag', { className: 'class1' }, child1, chlild2, child3)
+
+```
+
+## Url 到页面发生了什么
+
+先是 URl-》Dns解析获取服务器ip地址，端口-》利用ip地址和服务器建立Tcp连接，构建请求头信息，发送请求头信息-》HTTp-》响应解析（SSr，spa）,再到浏览器渲染
