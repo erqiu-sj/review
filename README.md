@@ -646,4 +646,50 @@ React.createElement('tag', { className: 'class1' }, child1, chlild2, child3)
 
 ## Url 到页面发生了什么
 
-先是 URl-》Dns解析获取服务器ip地址，端口-》利用ip地址和服务器建立Tcp连接，构建请求头信息，发送请求头信息-》HTTp-》响应解析（SSr，spa）,再到浏览器渲染
+先是 URl-》Dns 解析获取服务器 ip 地址，端口-》利用 ip 地址和服务器建立 Tcp 连接，构建请求头信息，发送请求头信息-》HTTp-》响应解析（SSr，spa）,再到浏览器渲染
+
+## React_setState
+
+- 有时异步(普通使用) 有时同步(setimeout，dom 事件)
+- 有时合并(对象形式)，有时不合并(函数形式),比较好理解(类似 Object.assign)，函数无法合并
+
+## 列表渲染为何要用 key
+
+- diff 算法中通过 tag 和 key 判断，是否是同一个节点
+- 减少渲染次数，提升渲染性能
+
+## 函数组件 和 class 组件区别
+
+- 纯函数，输入 props，输出 JSX
+- 没有实力，没有生命周期，没有 state
+- 不能扩展其它方法
+
+## React 性能优化
+
+- 渲染列表时加 Key
+- 自定义事件、DOM 事件及时销毁
+- 合理使用异步组件
+- 减少函数 bind this 的次数
+- 合理使用 shouldComponentUpdate、PureComponent 和 memo
+- 合理使用 ImmutableJS
+- webpack 层面优化
+- 前端通用是能优化，如图片懒加载
+- 使用 SSR
+
+## React 和 Vue 的区别
+
+### 相同点
+
+- 都支持组件化
+- 都是数据驱动视图
+- 都是用 vdom 操作 DOM
+
+### 不同点
+
+- React 使用 JSX 拥抱 JS，Vue 使用模板拥抱 html
+- React 函数式编程，Vue 声明式编程
+- React 更多需要自力更生，Vue 把想要的都给你
+
+## 值类型和引用类型的区别
+
+引用类型的本质是相同的内存地址，出于性能问题考虑，所以 JS 对象使用引用类型，为了避免这种情况所以需要深拷贝
