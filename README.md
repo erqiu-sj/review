@@ -650,13 +650,130 @@ React.createElement('tag', { className: 'class1' }, child1, chlild2, child3)
 
 ## React_setState
 
-- 有时异步(普通使用) 有时同步(setimeout，dom 事件)
-- 有时合并(对象形式)，有时不合并(函数形式),比较好理解(类似 Object.assign)，函数无法合并
+- 生命周期和合成事件中
+  在 React 的生命周期和合成事件中， React 仍然处于他的更新机制中，这时无论调用多少次 setState，都会不会立即执行更新，而是将要更新的·存入 \_pendingStateQueue，将要更新的组件存入 dirtyComponent(脏组件)。
+  当上一次更新机制执行完毕，以生命周期为例，所有组件，即最顶层组件 didmount 后会将批处理标志设置为 false。这时将取出 dirtyComponent 中的组件以及 \_pendingStateQueue 中的 state 进行更新。这样就可以确保组件不会被重新渲染多次。
+
+  ```
+    componentDidMount() {
+  this.setState({
+      index: this.state.index + 1
+  })
+    console.log('state', this.state.index);
+  }
+  ```
+
+  所以，如上面的代码，当我们在执行 setState 后立即去获取 state，这时是获取不到更新后的 state 的，因为处于 React 的批处理机制中， state 被暂存起来，待批处理机制完成之后，统一进行更新。
+  所以。setState 本身并不是异步的，而是 React 的批处理机制给人一种异步的假象
+
+- 异步代码和原生事件中
+
+```
+componentDidMount() {
+    setTimeout(() => {
+      console.log('调用setState');
+this.setState({
+        index: this.state.index + 1
+})
+      console.log('state', this.state.index);
+}, 0);
+}
+```
+
+如上面的代码，当我们在异步代码中调用 setState 时，根据 JavaScript 的异步机制，会将异步代码先暂存，等所有同步代码执行完毕后在执行，这时 React 的批处理机制已经走完，处理标志设被设置为 false，这时再调用 setState 即可立即执行更新，拿到更新后的结果。
+在原生事件中调用 setState 并不会出发 React 的批处理机制，所以立即能拿到最新结
+
+- 最佳实践
+  setState 的第二个参数接收一个函数，该函数会在 React 的批处理机制完成之后调用，所以你想在调用 setState 后立即获取更新后的值，请在该回调函数中获取。
+  ```
+  this.setState({ index: this.state.index + 1 }, () => {
+      console.log(this.state.index);
+  })
+  ```
+
+## React 如何实现自己的事件机制
+
+React 事件并没有绑定在真实的 Dom 节点上，而是通过事件代理，在最外层的 document 上对事件进行统一分发。
+
+- 组件挂载、更新时
+  通过 lastProps、 nextProps 判断是否新增、删除事件分别调用事件注册、卸载方法。
+  调用 EventPluginHub 的 enqueuePutListener 进行事件存储
+  获取 document 对象。
+  根据事件名称（如 onClick、 onCaptureClick）判断是进行冒泡还是捕获。
+  判断是否存在 addEventListener 方法，否则使用 attachEvent（兼容 IE）。
+  给 document 注册原生事件回调为 dispatchEvent(统一的事件分发机制）
+- 事件初始化
+  EventPluginHub 负责管理 React 合成事件的 callback，它将 callback 存储在 listenerBank 中，另外还存储了负责合成事件的 Plugin。
+  获取绑定事件的元素的唯一标识 key。
+  将 callback 根据事件类型，元素的唯一标识 key 存储在 listenerBank 中。
+  listenerBank 的结构是： listenerBank[registrationName][key]。
+- 触发事件时
+  触发 document 注册原生事件的回调 dispatchEvent
+  获取到触发这个事件最深一级的元素
+  遍历这个元素的所有父元素，依次对每一级元素进行处理。
+  构造合成事件。
+  将每一级的合成事件存储在 eventQueue 事件队列中。
+  遍历 eventQueue。
+  通过 isPropagationStopped 判断当前事件是否执行了阻止冒泡方法。
+  如果阻止了冒泡，停止遍历，否则通过 executeDispatch 执行合成事件。
+  释放处理完成的事件。
+  `React在自己的合成事件中重写了 stopPropagation方法，将 isPropagationStopped设置为 true，然后在遍历每一级事件的过程中根据此遍历判断是否继续执行。这就是 React自己实现的冒泡机制。`
+
+## 为何 React 事件要自己绑定 this？
+
+在上面提到的事件处理流程中， React 在 document 上进行统一的事件分发， dispatchEvent 通过循环调用所有层级的事件来模拟事件冒泡和捕获。
+在 React 源码中，当具体到某一事件处理函数将要调用时，将调用 invokeGuardedCallback 方法。
+
+```
+function invokeGuardedCallback(name, func, a) {
+try {
+    func(a);
+} catch (x) {
+if (caughtError === null) {
+      caughtError = x;
+}
+}
+}
+```
+
+可见，事件处理函数是直接调用的，并没有指定调用的组件，所以不进行手动绑定的情况下直接获取到的 this 是不准确的，所以我们需要手动将当前组件绑定到 this 上
+
+## 原生事件和 React 事件的区别？
+
+React 事件使用驼峰命名，而不是全部小写。
+通过 JSX , 你传递一个函数作为事件处理程序，而不是一个字符串。
+在 React 中你不能通过返回 false 来阻止默认行为。必须明确调用 preventDefault。
+
+## React 和原生事件的执行顺序是什么？可以混用吗
+
+React 的所有事件都通过 document 进行统一分发。当真实 Dom 触发事件后冒泡到 document 后才会对 React 事件进行处理。
+所以原生的事件会先执行，然后执行 React 合成事件，最后执行真正在 document 上挂载的事件
+React 事件和原生事件最好不要混用。原生事件中如果执行了 stopPropagation 方法，则会导致其他 React 事件失效。因为所有元素的事件将无法冒泡到 document 上，导致所有的 React 事件都将无法被触发。。
+
+## 虚拟 Dom 比普通 Dom 更快吗
+
+很多文章说 VitrualDom 可以提升性能，这一说法实际上是很片面的。
+直接操作 DOM 是非常耗费性能的，这一点毋庸置疑。但是 React 使用 VitrualDom 也是无法避免操作 DOM 的。
+如果是首次渲染， VitrualDom 不具有任何优势，甚至它要进行更多的计算，消耗更多的内存。
+VitrualDom 的优势在于 React 的 Diff 算法和批处理策略， React 在页面更新之前，提前计算好了如何进行更新和渲染 DOM。实际上，这个计算过程我们在直接操作 DOM 时，也是可以自己判断和实现的，但是一定会耗费非常多的精力和时间，而且往往我们自己做的是不如 React 好的。所以，在这个过程中 React 帮助我们"提升了性能"。
+所以，我更倾向于说， VitrualDom 帮助我们提高了开发效率，在重复渲染时它帮助我们计算如何更高效的更新，而不是它比 DOM 操作更快。
 
 ## 列表渲染为何要用 key
 
-- diff 算法中通过 tag 和 key 判断，是否是同一个节点
+- diff 算法中通过 key 判断，是否是同一个节点
 - 减少渲染次数，提升渲染性能
+
+## React 组件的渲染流程是什么？
+
+- 使用 React.createElement 或 JSX 编写 React 组件，实际上所有的 JSX 代码最后都会转换成 React.createElement(...)， Babel 帮助我们完成了这个转换的过程。
+
+- createElement 函数对 key 和 ref 等特殊的 props 进行处理，并获取 defaultProps 对默认 props 进行赋值，并且对传入的孩子节点进行处理，最终构造成一个 ReactElement 对象（所谓的虚拟 DOM）。
+
+- ReactDOM.render 将生成好的虚拟 DOM 渲染到指定容器上，其中采用了批处理、事务等机制并且对特定浏览器进行了性能优化，最终转换为真实 DOM。
+
+## 为什么 React 组件首字母必须大写？
+
+babel 在编译时会判断 JSX 中组件的首字母，当首字母为小写时，其被认定为原生 DOM 标签， createElement 的第一个变量被编译为字符串；当首字母为大写时，其被认定为自定义组件， createElement 的第一个变量被编译为对象；
 
 ## 函数组件 和 class 组件区别
 
@@ -693,3 +810,20 @@ React.createElement('tag', { className: 'class1' }, child1, chlild2, child3)
 ## 值类型和引用类型的区别
 
 引用类型的本质是相同的内存地址，出于性能问题考虑，所以 JS 对象使用引用类型，为了避免这种情况所以需要深拷贝
+
+## viewport 设置
+
+`<meta name='viewport' content='width=device-width,initial-scale=1,user-scale=no' />`
+
+## 为什么要设置 viewport
+
+viewport 的设置不会对 PC 页面产生影响，但对于移动页面却很重要。下面我们举例来说明：
+
+媒体查询 @media
+
+- 响应式布局中，会根据媒体查询功能来适配多端布局，必须对 viewport 进行设置，否则根据查询到的尺寸无法正确匹配视觉宽度而导致布局混乱。如不设置 viewport 参数，多说移动端媒体查询的结果将是 980px 这个节点布局的参数，而非我们通常设置的 768px 范围内的这个布局参数
+- 由于目前多数手机的 dpr 都不再是 1，为了产出高保真页面，我们一般会给出 750px 的设计稿，那么就需要通过设置 viewport 的参数来进行整体换算，而不是在每次设置尺寸时进行长度的换算。
+
+```
+
+```
